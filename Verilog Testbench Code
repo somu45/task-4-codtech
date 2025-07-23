@@ -1,0 +1,64 @@
+`timescale 1ns/1ps
+
+module tb_fir_filter;
+
+    // Parameters
+    localparam DATA_WIDTH = 16;
+    // Clock period for 48 kHz sampling frequency (1 / 48000 Hz = 20.833 us)
+    localparam CLK_PERIOD_US = 20.833;
+
+    // Signals
+    reg                            clk;
+    reg                            reset;
+    reg  signed [DATA_WIDTH-1:0]   data_in;
+    wire signed [DATA_WIDTH-1:0]   data_out;
+
+    // Instantiate the DUT (Device Under Test)
+    fir_filter #(
+        .DATA_WIDTH(DATA_WIDTH)
+    ) dut (
+        .clk(clk),
+        .reset(reset),
+        .data_in(data_in),
+        .data_out(data_out)
+    );
+
+    // Clock generator
+    always #((CLK_PERIOD_US/2)/1000) clk = ~clk;
+
+    // Test stimulus
+    initial begin
+        // Initialize signals and apply reset
+        clk = 0;
+        reset = 1;
+        data_in = 0;
+        #((CLK_PERIOD_US)/1000 * 5); // Wait for a few cycles
+        reset = 0;
+        
+        // Generate a composite sine wave: 2kHz (passband) + 10kHz (stopband)
+        // Amplitude is scaled to fit within 16-bit signed range
+        for (integer i = 0; i < 1000; i = i + 1) begin
+            // Current time in seconds for sine calculation
+            real time_sec = i * (CLK_PERIOD_US * 1e-6);
+            
+            // 2kHz sine wave with amplitude ~10000
+            real sin_2k = 10000 * $sin(2 * 3.14159 * 2000 * time_sec);
+            
+            // 10kHz sine wave with amplitude ~10000
+            real sin_10k = 10000 * $sin(2 * 3.14159 * 10000 * time_sec);
+            
+            data_in = sin_2k + sin_10k;
+            #((CLK_PERIOD_US)/1000);
+        end
+        
+        $display("Simulation finished.");
+        $finish;
+    end
+    
+    // Optional: Dump waveform for viewing in a simulator like GTKWave or Vivado
+    initial begin
+        $dumpfile("fir_waveform.vcd");
+        $dumpvars(0, tb_fir_filter);
+    end
+
+endmodule
